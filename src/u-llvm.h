@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <memory>
+#include <regex>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -11,12 +12,15 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
+#include "u-parser.h"
 
 using namespace std;
 
+using syntax::ULangParser;
+
 class ULangLLVM {
  public:
-  ULangLLVM() {
+  ULangLLVM() : parser(std::make_unique<ULangParser>()) {
     init();
     setupExternalFns();
   }
@@ -37,6 +41,7 @@ class ULangLLVM {
   std::unique_ptr<llvm::LLVMContext> ctx;
   std::unique_ptr<llvm::Module> module;
   std::unique_ptr<llvm::IRBuilder<>> builder;
+  std::unique_ptr<ULangParser> parser;
   llvm::Function *fn;
 
   void init() {
@@ -51,7 +56,7 @@ class ULangLLVM {
     module->print(outLL, nullptr);
   }
 
-  void compile(const std::string &ast) {
+  void compile(const Expression &ast) {
     fn = createFn("main", llvm::FunctionType::get(builder->getInt32Ty(), false));
 
     auto res = gen(ast);
@@ -97,14 +102,42 @@ class ULangLLVM {
     return llvm::BasicBlock::Create(*ctx, name, fn);
   }
 
-  llvm::Value *gen() {
-    auto str = builder->CreateGlobalStringPtr("Generated from LLVM");
+  llvm::Value *gen(const Expression &expr) {
+    switch (expr.type) {
+      case ExpressionType::NUMBER:
+        return builder->getInt32(expr.number);
 
-    auto printFn = module->getFunction("printf");
+      case ExpressionType::STRING: {
+        auto re = std::regex("\\\\n");
+        auto str = std::regex_replace(expr.string, re, "\n");
 
-    vector<llvm::Value *> args{str};
+        return builder->CreateGlobalStringPtr(str);
+      }
 
-    return builder->CreateCall(printFn, args)
+      case ExpressionType::SYMBOL:
+        return genSymbol(expr.string);
+
+      case ExpressionType::LIST:
+        auto t = expr.list[0];
+
+        if (t.type == ExpressionType::SYMBOL) {
+          auto op = t.string;
+
+          if (op == "printf") {
+            auto printFn = module->getFunction("printf");
+
+            vector<llvm::Value *> args{str};
+
+            for (auto i = 0; i < expr.list.size(); i++) {
+              args.push_back(gen(expr.list[i]));
+            }
+
+            return builder->CreateCall(printFn, args);
+          }
+        }
+    };
+
+    return builder->getInt32(0);
   }
 };
 

@@ -3,7 +3,7 @@
 #include "u-llvm.h"
 
 int main(int argc, char const *argv[]) {
-  std::string program = R"(42)";
+  std::string program = R"(Hello, World!)";
 
   ULangLLVM vm;
 
