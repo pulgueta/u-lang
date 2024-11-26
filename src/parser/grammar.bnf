@@ -1,0 +1,68 @@
+%lex
+
+%%
+
+\/\/.*                                    %empty
+\/\*[\s\S]*?\*\/                          %empty
+
+\s+                                       %empty
+\"[^\"]*\"                                STRING
+\d+                                       NUMBER
+[\w+-*=!<>/]+                             SYMBOL
+
+/lex
+
+%{
+    emum class ExpressionType {
+        NUMBER,
+        STRING,
+        SYMBOL,
+        LIST
+    };
+
+    struct Expression {
+        ExpressionType type;
+        int number;
+        std::string string;
+        std::vector<Expression> list;
+
+        Expression(int number) : type(ExpressionType::Number), number(number) {}
+
+        Expression(std::string &val) {
+            if (val[0] == '"') {
+                type = ExpressionType::String;
+                string = val.substr(1, val.size() - 2);
+            } else {
+                type = ExpressionType::Symbol;
+                string = val;
+            }
+        }
+
+        Expression(std::vector<Expression> list) : type(ExpressionType::List), list(list) {}
+    };
+
+    using Value = Expression;
+%}
+
+%%
+
+Exp
+    : Atom
+    | List
+    ;
+
+Atom
+    : NUMBER         { $$ = Exp(std::stoi($1)) }
+    | STRING         { $$ = Exp($1) }
+    | SYMBOL         { $$ = Exp($1) }
+    ;
+
+List
+    : '(' ListEntries ')' { $$ = $2 }
+    ;
+
+ListEntries
+    : %empty               { $$ = Exp(std::vector<Exp>{}) }
+    | ListEntries Exp      { $1.list.push_back($2); $$ = $1 }
+    ;
+

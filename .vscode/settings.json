@@ -1,6 +1,8 @@
 {
     "files.associations": {
         ".env": "env",
-        "system_error": "cpp"
+        "system_error": "cpp",
+        "iostream": "cpp",
+        "format": "cpp"
     }
 }
